@@ -22,13 +22,11 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Classrooms", href: "/admin/classrooms", icon: <Building2 className="h-4 w-4" /> },
   { label: "Time Slots", href: "/admin/timeslots", icon: <Clock className="h-4 w-4" /> },
   { label: "Timetable", href: "/admin/timetable", icon: <CalendarDays className="h-4 w-4" /> },
-  { label: "Analytics", href: "/admin/analytics", icon: <BarChart3 className="h-4 w-4" /> },
 ];
 
 const FACULTY_NAV: NavItem[] = [
   { label: "Dashboard", href: "/faculty", icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: "My Timetable", href: "/faculty/timetable", icon: <CalendarDays className="h-4 w-4" /> },
-  { label: "My Courses", href: "/faculty/courses", icon: <BookOpen className="h-4 w-4" /> },
 ];
 
 const STUDENT_NAV: NavItem[] = [

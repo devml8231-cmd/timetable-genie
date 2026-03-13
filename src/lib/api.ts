@@ -21,8 +21,25 @@ api.interceptors.request.use((config) => {
       Authorization: `Bearer ${token}`,
     };
   }
+  // Log all API requests for debugging
+  console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   return config;
 });
+
+// Add response interceptor for debugging
+api.interceptors.response.use(
+  (response) => {
+    console.log(`API Response: ${response.config.url}`, {
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
+  (error) => {
+    console.error(`API Error: ${error.config?.url}`, error);
+    return Promise.reject(error);
+  }
+);
 
 export interface LoginResponse {
   user: {

@@ -132,7 +132,7 @@ const generateTimetable = asyncHandler(async (req, res, next) => {
 
 /**
  * @route   GET /api/timetable/:department/:semester
- * @desc    Get timetable for a department and semester
+ * @desc    Get timetable for a department and semester using timetable_view
  * @access  Private
  */
 const getTimetable = asyncHandler(async (req, res, next) => {
@@ -140,21 +140,21 @@ const getTimetable = asyncHandler(async (req, res, next) => {
 
   logger.info(`Fetching timetable for ${department} - Semester ${semester}`);
 
-  // First, get basic timetable data
-  const { data: basicData, error: basicError } = await supabase
-    .from('timetable')
+  // Fetch from timetable_view directly
+  const { data: viewData, error: viewError } = await supabase
+    .from('timetable_view')
     .select('*')
     .eq('department', department)
     .eq('semester', parseInt(semester));
 
-  if (basicError) {
-    logger.error('Error fetching basic timetable:', JSON.stringify(basicError));
+  if (viewError) {
+    logger.error('Error fetching timetable_view:', JSON.stringify(viewError));
     return next(new AppError('Failed to fetch timetable', 500));
   }
 
-  logger.info(`Found ${basicData.length} timetable entries (basic)`);
+  logger.info(`Found ${viewData.length} timetable entries from view`);
 
-  if (basicData.length === 0) {
+  if (viewData.length === 0) {
     return res.status(200).json({
       success: true,
       count: 0,
@@ -162,40 +162,32 @@ const getTimetable = asyncHandler(async (req, res, next) => {
     });
   }
 
-  // Fetch all related data separately
-  const courseIds = [...new Set(basicData.map(t => t.course_id))];
-  const roomIds = [...new Set(basicData.map(t => t.room_id))];
-  const timeSlotIds = [...new Set(basicData.map(t => t.time_slot))];
-  const facultyIds = [...new Set(basicData.map(t => t.faculty_id))];
-
-  const [coursesRes, roomsRes, timeSlotsRes, facultyRes] = await Promise.all([
-    supabase.from('courses').select('*').in('id', courseIds),
-    supabase.from('rooms').select('*').in('id', roomIds),
-    supabase.from('time_slots').select('*').in('id', timeSlotIds),
-    supabase.from('users').select('id, name, email').in('id', facultyIds)
-  ]);
-
-  // Create lookup maps
-  const coursesMap = {};
-  const roomsMap = {};
-  const timeSlotsMap = {};
-  const facultyMap = {};
-
-  if (coursesRes.data) coursesRes.data.forEach(c => coursesMap[c.id] = c);
-  if (roomsRes.data) roomsRes.data.forEach(r => roomsMap[r.id] = r);
-  if (timeSlotsRes.data) timeSlotsRes.data.forEach(ts => timeSlotsMap[ts.id] = ts);
-  if (facultyRes.data) facultyRes.data.forEach(f => facultyMap[f.id] = f);
-
-  // Combine the data
-  const transformedData = basicData.map(item => ({
-    ...item,
-    course: coursesMap[item.course_id] || null,
-    faculty: facultyMap[item.faculty_id] || null,
-    room: roomsMap[item.room_id] || null,
-    time_slot_details: timeSlotsMap[item.time_slot] || null
+  // Transform the data to match expected frontend format
+  const transformedData = viewData.map(item => ({
+    id: item.id,
+    day: item.day,
+    semester: item.semester,
+    department: item.department,
+    // Add nested objects for frontend compatibility
+    course: {
+      course_name: item.course_name
+    },
+    faculty: {
+      name: item.faculty_name,
+      email: item.faculty_email
+    },
+    room: {
+      room_name: item.room_name,
+      capacity: item.capacity
+    },
+    time_slot_details: {
+      day: item.day,
+      start_time: item.start_time,
+      end_time: item.end_time
+    }
   }));
 
-  logger.info(`Transformed ${transformedData.length} entries with joins`);
+  logger.info(`Transformed ${transformedData.length} entries with data from view`);
 
   res.status(200).json({
     success: true,
@@ -206,42 +198,99 @@ const getTimetable = asyncHandler(async (req, res, next) => {
 
 /**
  * @route   GET /api/faculty/:id/timetable
- * @desc    Get timetable for a specific faculty
+ * @desc    Get timetable for a specific faculty using timetable_view
  * @access  Private
  */
 const getFacultyTimetable = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   const { semester } = req.query;
 
+  logger.info(`=== FACULTY TIMETABLE REQUEST ===`);
+  logger.info(`Faculty ID: ${id}`);
+  logger.info(`Semester filter: ${semester || 'none'}`);
+
   try {
-    let query = supabase
+    // Get timetable ID and faculty_id mapping first
+    let timetableQuery = supabase
       .from('timetable')
-      .select(`
-        *,
-        courses!inner(id, course_name, department, weekly_hours),
-        rooms!inner(id, room_name, capacity),
-        time_slots!inner(id, day, start_time, end_time)
-      `)
+      .select('id, faculty_id')
       .eq('faculty_id', id);
 
     if (semester) {
-      query = query.eq('semester', parseInt(semester));
+      timetableQuery = timetableQuery.eq('semester', parseInt(semester));
     }
 
-    const { data, error } = await query;
+    const { data: timetableIds, error: timetableError } = await timetableQuery;
 
-    if (error) {
-      logger.error('Error fetching faculty timetable:', error);
+    if (timetableError) {
+      logger.error('Error fetching timetable IDs:', timetableError);
       return next(new AppError('Failed to fetch timetable', 500));
     }
 
-    // Transform the data to match expected format
-    const transformedData = data.map(item => ({
-      ...item,
-      course: item.courses,
-      room: item.rooms,
-      time_slot_details: item.time_slots
+    if (!timetableIds || timetableIds.length === 0) {
+      logger.warn(`No timetable entries found for faculty_id: ${id}`);
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: { timetable: [] }
+      });
+    }
+
+    logger.info(`Found ${timetableIds.length} timetable entries for faculty ${id}`);
+
+    // Now fetch from timetable_view using the IDs
+    const ids = timetableIds.map(t => t.id);
+    const { data: viewData, error: viewError } = await supabase
+      .from('timetable_view')
+      .select('*')
+      .in('id', ids);
+
+    if (viewError) {
+      logger.error('Error fetching from timetable_view:', viewError);
+      return next(new AppError('Failed to fetch timetable view', 500));
+    }
+
+    // Transform the data to match expected frontend format
+    const transformedData = viewData.map(item => ({
+      id: item.id,
+      day: item.day,
+      course_id: null, // Not in view, but keeping for compatibility
+      faculty_id: id,
+      room_id: null, // Not in view, but keeping for compatibility
+      time_slot: null, // Not in view, but keeping for compatibility
+      semester: item.semester,
+      department: item.department,
+      // Add nested objects for frontend compatibility
+      courses: {
+        course_name: item.course_name
+      },
+      course: {
+        course_name: item.course_name
+      },
+      rooms: {
+        room_name: item.room_name,
+        capacity: item.capacity
+      },
+      room: {
+        room_name: item.room_name,
+        capacity: item.capacity
+      },
+      time_slots: {
+        day: item.day,
+        start_time: item.start_time,
+        end_time: item.end_time
+      },
+      time_slot_details: {
+        day: item.day,
+        start_time: item.start_time,
+        end_time: item.end_time
+      },
+      faculty_name: item.faculty_name,
+      faculty_email: item.faculty_email
     }));
+
+    logger.info(`Returning ${transformedData.length} entries from timetable_view`);
+    logger.info(`Sample entry:`, JSON.stringify(transformedData[0], null, 2));
 
     res.status(200).json({
       success: true,
@@ -249,7 +298,7 @@ const getFacultyTimetable = asyncHandler(async (req, res, next) => {
       data: { timetable: transformedData }
     });
   } catch (error) {
-    logger.error('Failed to fetch timetable');
+    logger.error('Failed to fetch timetable:', error);
     return next(new AppError('Failed to fetch timetable', 500));
   }
 });

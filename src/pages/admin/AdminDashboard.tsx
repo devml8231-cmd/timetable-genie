@@ -117,12 +117,11 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { label: "Manage Courses", href: "/admin/courses", icon: <BookOpen className="h-5 w-5" /> },
           { label: "Manage Faculty", href: "/admin/faculty", icon: <Users className="h-5 w-5" /> },
           { label: "View Timetable", href: "/admin/timetable", icon: <CalendarDays className="h-5 w-5" /> },
-          { label: "Analytics", href: "/admin/analytics", icon: <Zap className="h-5 w-5" /> },
         ].map((q) => (
           <Link key={q.href} to={q.href} className="bg-card border rounded-xl p-4 flex flex-col items-center gap-2 text-center shadow-card hover:shadow-elevated hover:border-accent/50 transition-all group">
             <div className="p-2 bg-muted rounded-lg group-hover:bg-accent/10 transition-colors text-muted-foreground group-hover:text-accent">
