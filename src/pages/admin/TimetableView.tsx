@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TimetableGrid } from "@/types";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { createTimeSlotLabel } from "@/lib/utils";
 
 export default function TimetableView() {
   const [dept, setDept] = useState("Computer Science");
@@ -43,10 +44,7 @@ export default function TimetableView() {
           return;
         }
         
-        // Normalize time format to match mockData (remove leading zeros)
-        const startFormatted = start.slice(0, 5).replace(/^0/, '');
-        const endFormatted = end.slice(0, 5).replace(/^0/, '');
-        const slotLabel = `${startFormatted} - ${endFormatted}`;
+        const slotLabel = createTimeSlotLabel(start, end);
         
         if (!grid[day]) grid[day] = {};
         grid[day][slotLabel] = {

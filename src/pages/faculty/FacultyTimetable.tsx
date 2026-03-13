@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchFacultyTimetable } from "@/lib/api";
 import { TimetableGrid } from "@/types";
+import { createTimeSlotLabel } from "@/lib/utils";
 
 export default function FacultyTimetable() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ export default function FacultyTimetable() {
         const start = row.time_slot_details?.start_time;
         const end = row.time_slot_details?.end_time;
         if (!day || !start || !end) return;
-        const slotLabel = `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+        const slotLabel = createTimeSlotLabel(start, end);
         if (!grid[day]) grid[day] = {};
         grid[day][slotLabel] = {
           courseCode: row.course?.course_name || String(row.course_id),

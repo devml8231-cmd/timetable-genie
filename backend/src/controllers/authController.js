@@ -9,9 +9,9 @@ const logger = require('../config/logger');
  * @access  Public
  */
 const register = asyncHandler(async (req, res, next) => {
-  const { email, password, name, role, department } = req.body;
+  const { email, password, name, role, department, semester } = req.body;
 
-  logger.info(`Registration attempt for: ${email}, role: ${role}, department: ${department}`);
+  logger.info(`Registration attempt for: ${email}, role: ${role}, department: ${department}, semester: ${semester}`);
 
   // Validate role
   const validRoles = ['admin', 'faculty', 'student'];
@@ -37,17 +37,22 @@ const register = asyncHandler(async (req, res, next) => {
 
   // Create user record in users table
   logger.info('Creating user record in users table...');
+  const insertData = {
+    id: authData.user.id,
+    email,
+    name,
+    role,
+    department
+  };
+  
+  // Add semester for students
+  if (role === 'student' && semester) {
+    insertData.semester = semester;
+  }
+  
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .insert([
-      {
-        id: authData.user.id,
-        email,
-        name,
-        role,
-        department
-      }
-    ])
+    .insert([insertData])
     .select()
     .single();
 
@@ -189,7 +194,7 @@ const getUsers = asyncHandler(async (req, res, next) => {
  */
 const updateUser = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { name, email, department } = req.body;
+  const { name, email, department, semester } = req.body;
 
   // Check if user is admin or updating their own profile
   if (req.user.role !== 'admin' && req.user.id !== id) {
@@ -200,6 +205,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
   if (name) updateData.name = name;
   if (email) updateData.email = email;
   if (department) updateData.department = department;
+  if (semester !== undefined) updateData.semester = semester;
 
   const { data, error } = await supabase
     .from('users')

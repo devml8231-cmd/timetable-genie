@@ -19,14 +19,14 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState<UserRole>("admin");
-  const [email, setEmail] = useState("admin@edu.ac.in");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("admin@gmail.com");
+  const [password, setPassword] = useState("12345678");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleRoleChange = (r: UserRole) => {
     setRole(r);
-    setEmail(`${r}@edu.ac.in`);
+    setEmail(`${r}@gmail.com`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -54,6 +54,7 @@ export async function registerApi(payload: {
   password: string;
   role: "admin" | "faculty" | "student";
   department: string;
+  semester?: number;
 }) {
   const res = await api.post<{ success: boolean; data: { user: any } }>(
     "/api/auth/register",

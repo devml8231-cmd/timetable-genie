@@ -24,6 +24,7 @@ import FacultyTimetable from "@/pages/faculty/FacultyTimetable";
 
 // Student
 import StudentDashboard from "@/pages/student/StudentDashboard";
+import StudentTimetable from "@/pages/student/StudentTimetable";
 
 import NotFound from "./pages/NotFound";
 
@@ -60,7 +61,7 @@ function AppRoutes() {
 
       {/* Student Routes */}
       <Route path="/student" element={<StudentDashboard />} />
-      <Route path="/student/timetable" element={<StudentDashboard />} />
+      <Route path="/student/timetable" element={<StudentTimetable />} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

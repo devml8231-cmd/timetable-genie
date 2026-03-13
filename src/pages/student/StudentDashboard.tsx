@@ -10,9 +10,12 @@ import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDepartmentTimetable } from "@/lib/api";
 import { TimetableGrid } from "@/types";
+import { useNavigate } from "react-router-dom";
+import { createTimeSlotLabel } from "@/lib/utils";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [dept, setDept] = useState(user?.department || "Computer Science");
   const [sem, setSem] = useState(String(user?.semester || 3));
 
@@ -26,7 +29,7 @@ export default function StudentDashboard() {
         const start = row.time_slot_details?.start_time;
         const end = row.time_slot_details?.end_time;
         if (!day || !start || !end) return;
-        const slotLabel = `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+        const slotLabel = createTimeSlotLabel(start, end);
         if (!grid[day]) grid[day] = {};
         grid[day][slotLabel] = {
           courseCode: row.course?.course_name || String(row.course_id),
@@ -100,6 +103,13 @@ export default function StudentDashboard() {
             <h3 className="font-semibold text-foreground">Class Schedule</h3>
             <p className="text-xs text-muted-foreground">{dept} · Semester {sem}</p>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate("/student/timetable")}
+          >
+            View Full Schedule
+          </Button>
         </div>
         {timetableQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading timetable...</p>

@@ -40,13 +40,20 @@ export default function Register() {
     
     setLoading(true);
     try {
-      await registerApi({
+      const payload: any = {
         name: form.name,
         email: form.email,
         password: form.password,
         role: form.role,
         department: form.department,
-      });
+      };
+      
+      // Add semester for students
+      if (form.role === "student" && form.semester) {
+        payload.semester = parseInt(form.semester);
+      }
+      
+      await registerApi(payload);
       toast({ 
         title: "Registration Successful!", 
         description: "You can now log in with your credentials." 
