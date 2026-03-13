@@ -11,13 +11,17 @@ const logger = require('../config/logger');
 const register = asyncHandler(async (req, res, next) => {
   const { email, password, name, role, department } = req.body;
 
+  logger.info(`Registration attempt for: ${email}, role: ${role}, department: ${department}`);
+
   // Validate role
   const validRoles = ['admin', 'faculty', 'student'];
   if (!validRoles.includes(role)) {
+    logger.error(`Invalid role specified: ${role}`);
     return next(new AppError('Invalid role specified', 400));
   }
 
   // Create user with Supabase Auth
+  logger.info('Creating user in Supabase Auth...');
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -25,11 +29,14 @@ const register = asyncHandler(async (req, res, next) => {
   });
 
   if (authError) {
-    logger.error('Auth registration error:', authError);
+    logger.error('Auth registration error:', JSON.stringify(authError));
     return next(new AppError(authError.message, 400));
   }
 
+  logger.info(`Auth user created with ID: ${authData.user.id}`);
+
   // Create user record in users table
+  logger.info('Creating user record in users table...');
   const { data: userData, error: userError } = await supabase
     .from('users')
     .insert([
@@ -45,13 +52,14 @@ const register = asyncHandler(async (req, res, next) => {
     .single();
 
   if (userError) {
-    logger.error('User creation error:', userError);
+    logger.error('User creation error:', JSON.stringify(userError));
     // Rollback - delete auth user
+    logger.info('Rolling back auth user creation...');
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    return next(new AppError('Failed to create user profile', 500));
+    return next(new AppError(`Failed to create user profile: ${userError.message}`, 500));
   }
 
-  logger.info(`New user registered: ${email}`);
+  logger.info(`New user registered successfully: ${email}`);
 
   res.status(201).json({
     success: true,
@@ -141,9 +149,142 @@ const getMe = asyncHandler(async (req, res, next) => {
   });
 });
 
+/**
+ * @route   GET /api/auth/users
+ * @desc    Get all users with optional role filter
+ * @access  Private
+ */
+const getUsers = asyncHandler(async (req, res, next) => {
+  const { role } = req.query;
+
+  let query = supabase
+    .from('users')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (role) {
+    query = query.eq('role', role);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    logger.error('Error fetching users:', error);
+    return next(new AppError('Failed to fetch users', 500));
+  }
+
+  res.status(200).json({
+    success: true,
+    count: data.length,
+    data: {
+      users: data
+    }
+  });
+});
+
+/**
+ * @route   PUT /api/auth/users/:id
+ * @desc    Update user profile
+ * @access  Private (Admin or own profile)
+ */
+const updateUser = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const { name, email, department } = req.body;
+
+  // Check if user is admin or updating their own profile
+  if (req.user.role !== 'admin' && req.user.id !== id) {
+    return next(new AppError('Not authorized to update this user', 403));
+  }
+
+  const updateData = {};
+  if (name) updateData.name = name;
+  if (email) updateData.email = email;
+  if (department) updateData.department = department;
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    logger.error('Error updating user:', error);
+    return next(new AppError('Failed to update user', 500));
+  }
+
+  if (!data) {
+    return next(new AppError('User not found', 404));
+  }
+
+  logger.info(`User updated: ${id}`);
+
+  res.status(200).json({
+    success: true,
+    message: 'User updated successfully',
+    data: {
+      user: data
+    }
+  });
+});
+
+/**
+ * @route   DELETE /api/auth/users/:id
+ * @desc    Delete user
+ * @access  Private (Admin only)
+ */
+const deleteUser = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+
+  // Check if user has assigned courses
+  const { data: coursesData, error: coursesError } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('faculty_id', id)
+    .limit(1);
+
+  if (coursesError) {
+    logger.error('Error checking courses:', coursesError);
+    return next(new AppError('Failed to validate user deletion', 500));
+  }
+
+  if (coursesData && coursesData.length > 0) {
+    return next(new AppError('Cannot delete user with assigned courses', 400));
+  }
+
+  // Delete from users table
+  const { error: deleteError } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) {
+    logger.error('Error deleting user:', deleteError);
+    return next(new AppError('Failed to delete user', 500));
+  }
+
+  // Delete from Supabase Auth
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+
+  if (authError) {
+    logger.error('Error deleting auth user:', authError);
+    // User already deleted from users table, just log the error
+  }
+
+  logger.info(`User deleted: ${id}`);
+
+  res.status(200).json({
+    success: true,
+    message: 'User deleted successfully'
+  });
+});
+
 module.exports = {
   register,
   login,
   logout,
-  getMe
+  getMe,
+  getUsers,
+  updateUser,
+  deleteUser
 };

@@ -1,12 +1,13 @@
 import AppLayout from "@/components/layout/AppLayout";
 import StatCard from "@/components/ui/StatCard";
-import { MOCK_COURSES, MOCK_FACULTY, MOCK_CLASSROOMS, WORKLOAD_DATA } from "@/lib/mockData";
 import { BookOpen, Users, Building2, CalendarDays, Zap, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCourses, fetchRooms, fetchFacultyWorkloadAnalytics } from "@/lib/api";
 
 const RECENT_ACTIVITIES = [
   { text: "New faculty Dr. Kapoor added", time: "2 min ago", type: "success" },
@@ -18,6 +19,20 @@ const RECENT_ACTIVITIES = [
 export default function AdminDashboard() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
+
+  const coursesQuery = useQuery({ queryKey: ["courses"], queryFn: fetchCourses });
+  const roomsQuery = useQuery({ queryKey: ["rooms"], queryFn: fetchRooms });
+  const workloadQuery = useQuery({
+    queryKey: ["analytics", "faculty-workload"],
+    queryFn: async () => {
+      const data = await fetchFacultyWorkloadAnalytics();
+      const chart: { name: string; hours: number }[] = data.workload.map((w: any) => ({
+        name: w.faculty_name,
+        hours: w.total_hours,
+      }));
+      return chart;
+    },
+  });
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -58,9 +73,9 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Courses" value={MOCK_COURSES.length} subtitle="+2 this semester" icon={<BookOpen className="h-5 w-5 text-primary-foreground" />} iconBg="gradient-card" trend={{ value: 12, label: "from last sem" }} />
-        <StatCard title="Faculty Members" value={MOCK_FACULTY.length} subtitle="Across all depts." icon={<Users className="h-5 w-5 text-white" />} iconBg="gradient-teal" trend={{ value: 5, label: "from last sem" }} />
-        <StatCard title="Classrooms" value={MOCK_CLASSROOMS.length} subtitle="Available rooms" icon={<Building2 className="h-5 w-5 text-white" />} iconBg="bg-warning" />
+        <StatCard title="Total Courses" value={coursesQuery.data?.length ?? 0} subtitle="+2 this semester" icon={<BookOpen className="h-5 w-5 text-primary-foreground" />} iconBg="gradient-card" trend={{ value: 12, label: "from last sem" }} />
+        <StatCard title="Faculty Members" value={workloadQuery.data?.length ?? 0} subtitle="Across all depts." icon={<Users className="h-5 w-5 text-white" />} iconBg="gradient-teal" trend={{ value: 5, label: "from last sem" }} />
+        <StatCard title="Classrooms" value={roomsQuery.data?.length ?? 0} subtitle="Available rooms" icon={<Building2 className="h-5 w-5 text-white" />} iconBg="bg-warning" />
         <StatCard title="Timetables" value="12" subtitle="Departments active" icon={<CalendarDays className="h-5 w-5 text-white" />} iconBg="bg-success" trend={{ value: 8, label: "efficiency gain" }} />
       </div>
 
@@ -71,7 +86,7 @@ export default function AdminDashboard() {
           <h3 className="font-semibold text-foreground mb-1">Faculty Workload (hrs/week)</h3>
           <p className="text-xs text-muted-foreground mb-4">Distribution across all faculty members</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={WORKLOAD_DATA} barSize={28}>
+            <BarChart data={workloadQuery.data ?? []} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 28%, 92%)" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => v.split(" ")[1]} />
               <YAxis tick={{ fontSize: 10 }} />

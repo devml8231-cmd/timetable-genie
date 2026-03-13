@@ -5,9 +5,12 @@ const {
   register,
   login,
   logout,
-  getMe
+  getMe,
+  getUsers,
+  updateUser,
+  deleteUser
 } = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -30,5 +33,8 @@ router.post('/register', registerValidation, validate, register);
 router.post('/login', loginValidation, validate, login);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);
+router.get('/users', authenticate, getUsers);
+router.put('/users/:id', authenticate, updateUser);
+router.delete('/users/:id', authenticate, authorize('admin'), deleteUser);
 
 module.exports = router;

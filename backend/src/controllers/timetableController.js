@@ -138,29 +138,69 @@ const generateTimetable = asyncHandler(async (req, res, next) => {
 const getTimetable = asyncHandler(async (req, res, next) => {
   const { department, semester } = req.params;
 
-  const { data, error } = await supabase
-    .from('timetable')
-    .select(`
-      *,
-      course:courses(id, course_name, weekly_hours),
-      faculty:users!faculty_id(id, name, email),
-      room:rooms(id, room_name, capacity),
-      time_slot_details:time_slots!time_slot(id, day, start_time, end_time)
-    `)
-    .eq('department', department)
-    .eq('semester', semester)
-    .order('day', { ascending: true })
-    .order('time_slot', { ascending: true });
+  logger.info(`Fetching timetable for ${department} - Semester ${semester}`);
 
-  if (error) {
-    logger.error('Error fetching timetable:', error);
+  // First, get basic timetable data
+  const { data: basicData, error: basicError } = await supabase
+    .from('timetable')
+    .select('*')
+    .eq('department', department)
+    .eq('semester', parseInt(semester));
+
+  if (basicError) {
+    logger.error('Error fetching basic timetable:', JSON.stringify(basicError));
     return next(new AppError('Failed to fetch timetable', 500));
   }
 
+  logger.info(`Found ${basicData.length} timetable entries (basic)`);
+
+  if (basicData.length === 0) {
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      data: { timetable: [] }
+    });
+  }
+
+  // Fetch all related data separately
+  const courseIds = [...new Set(basicData.map(t => t.course_id))];
+  const roomIds = [...new Set(basicData.map(t => t.room_id))];
+  const timeSlotIds = [...new Set(basicData.map(t => t.time_slot))];
+  const facultyIds = [...new Set(basicData.map(t => t.faculty_id))];
+
+  const [coursesRes, roomsRes, timeSlotsRes, facultyRes] = await Promise.all([
+    supabase.from('courses').select('*').in('id', courseIds),
+    supabase.from('rooms').select('*').in('id', roomIds),
+    supabase.from('time_slots').select('*').in('id', timeSlotIds),
+    supabase.from('users').select('id, name, email').in('id', facultyIds)
+  ]);
+
+  // Create lookup maps
+  const coursesMap = {};
+  const roomsMap = {};
+  const timeSlotsMap = {};
+  const facultyMap = {};
+
+  if (coursesRes.data) coursesRes.data.forEach(c => coursesMap[c.id] = c);
+  if (roomsRes.data) roomsRes.data.forEach(r => roomsMap[r.id] = r);
+  if (timeSlotsRes.data) timeSlotsRes.data.forEach(ts => timeSlotsMap[ts.id] = ts);
+  if (facultyRes.data) facultyRes.data.forEach(f => facultyMap[f.id] = f);
+
+  // Combine the data
+  const transformedData = basicData.map(item => ({
+    ...item,
+    course: coursesMap[item.course_id] || null,
+    faculty: facultyMap[item.faculty_id] || null,
+    room: roomsMap[item.room_id] || null,
+    time_slot_details: timeSlotsMap[item.time_slot] || null
+  }));
+
+  logger.info(`Transformed ${transformedData.length} entries with joins`);
+
   res.status(200).json({
     success: true,
-    count: data.length,
-    data: { timetable: data }
+    count: transformedData.length,
+    data: { timetable: transformedData }
   });
 });
 
@@ -173,34 +213,45 @@ const getFacultyTimetable = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   const { semester } = req.query;
 
-  let query = supabase
-    .from('timetable')
-    .select(`
-      *,
-      course:courses(id, course_name, department, weekly_hours),
-      room:rooms(id, room_name, capacity),
-      time_slot_details:time_slots!time_slot(id, day, start_time, end_time)
-    `)
-    .eq('faculty_id', id)
-    .order('day', { ascending: true })
-    .order('time_slot', { ascending: true });
+  try {
+    let query = supabase
+      .from('timetable')
+      .select(`
+        *,
+        courses!inner(id, course_name, department, weekly_hours),
+        rooms!inner(id, room_name, capacity),
+        time_slots!inner(id, day, start_time, end_time)
+      `)
+      .eq('faculty_id', id);
 
-  if (semester) {
-    query = query.eq('semester', semester);
+    if (semester) {
+      query = query.eq('semester', parseInt(semester));
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      logger.error('Error fetching faculty timetable:', error);
+      return next(new AppError('Failed to fetch timetable', 500));
+    }
+
+    // Transform the data to match expected format
+    const transformedData = data.map(item => ({
+      ...item,
+      course: item.courses,
+      room: item.rooms,
+      time_slot_details: item.time_slots
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: transformedData.length,
+      data: { timetable: transformedData }
+    });
+  } catch (error) {
+    logger.error('Failed to fetch timetable');
+    return next(new AppError('Failed to fetch timetable', 500));
   }
-
-  const { data, error } = await query;
-
-  if (error) {
-    logger.error('Error fetching faculty timetable:', error);
-    return next(new AppError('Failed to fetch faculty timetable', 500));
-  }
-
-  res.status(200).json({
-    success: true,
-    count: data.length,
-    data: { timetable: data }
-  });
 });
 
 /**

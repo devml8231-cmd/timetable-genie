@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { Calendar, Loader2, ArrowLeft } from "lucide-react";
 import { DEPARTMENTS } from "@/lib/mockData";
 import { UserRole } from "@/types";
+import { registerApi } from "@/lib/api";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -32,11 +33,35 @@ export default function Register() {
       toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
+    if (form.password.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+    
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    toast({ title: "Registration Successful!", description: "Your account is pending approval." });
-    navigate("/login");
-    setLoading(false);
+    try {
+      await registerApi({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        department: form.department,
+      });
+      toast({ 
+        title: "Registration Successful!", 
+        description: "You can now log in with your credentials." 
+      });
+      navigate("/login");
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      toast({ 
+        title: "Registration Failed", 
+        description: error.response?.data?.message || "An error occurred during registration.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,6 +107,7 @@ export default function Register() {
                 <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as UserRole })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="faculty">Faculty</SelectItem>
                     <SelectItem value="student">Student</SelectItem>
                   </SelectContent>

@@ -1,27 +1,124 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { TIME_SLOTS, DEPARTMENTS, SEMESTERS } from "@/lib/mockData";
-import { MOCK_TIMETABLE_CS3 } from "@/lib/mockData";
+import { DEPARTMENTS, SEMESTERS } from "@/lib/mockData";
 import TimetableGridView from "@/components/ui/TimetableGridView";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, RefreshCw, Zap, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { generateDepartmentTimetable, fetchDepartmentTimetable } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TimetableGrid } from "@/types";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 export default function TimetableView() {
   const [dept, setDept] = useState("Computer Science");
-  const [sem, setSem] = useState("3");
+  const [sem, setSem] = useState("1");
   const [generating, setGenerating] = useState(false);
-  const [showTimetable, setShowTimetable] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const timetableRef = useRef<HTMLDivElement>(null);
+
+  const queryClient = useQueryClient();
+
+  const timetableQuery = useQuery({
+    queryKey: ["timetable", dept, sem],
+    queryFn: async () => {
+      const data = await fetchDepartmentTimetable(dept, Number(sem));
+      console.log("Timetable data received:", data);
+      console.log("Sample entry:", data[0]);
+      
+      // Transform API rows into TimetableGridView shape
+      const grid: TimetableGrid = {};
+      data.forEach((row: any) => {
+        console.log("Processing row:", row);
+        const day = row.time_slot_details?.day || row.day;
+        const start = row.time_slot_details?.start_time;
+        const end = row.time_slot_details?.end_time;
+        console.log(`Day: ${day}, Start: ${start}, End: ${end}`);
+        
+        if (!day || !start || !end) {
+          console.log("Skipping row - missing day/time info");
+          return;
+        }
+        
+        // Normalize time format to match mockData (remove leading zeros)
+        const startFormatted = start.slice(0, 5).replace(/^0/, '');
+        const endFormatted = end.slice(0, 5).replace(/^0/, '');
+        const slotLabel = `${startFormatted} - ${endFormatted}`;
+        
+        if (!grid[day]) grid[day] = {};
+        grid[day][slotLabel] = {
+          courseCode: row.course?.course_name || String(row.course_id),
+          courseName: row.course?.course_name || "",
+          facultyName: row.faculty?.name,
+          room: row.room?.room_name,
+          type: "lecture",
+        };
+      });
+      console.log("Final grid:", grid);
+      return grid;
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: () => generateDepartmentTimetable(dept, Number(sem)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["timetable", dept, sem] });
+      toast({ title: "Timetable Generated!", description: `${dept} - Semester ${sem} schedule is ready.` });
+    },
+    onError: () => {
+      toast({
+        title: "Generation failed",
+        description: "Could not generate timetable. Please check constraints and data.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleGenerate = async () => {
     setGenerating(true);
-    setShowTimetable(false);
-    await new Promise((r) => setTimeout(r, 2000));
+    await generateMutation.mutateAsync();
     setGenerating(false);
-    setShowTimetable(true);
-    toast({ title: "Timetable Generated!", description: `${dept} - Semester ${sem} schedule is ready.` });
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!timetableRef.current) return;
+    
+    setDownloading(true);
+    try {
+      const element = timetableRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const imgWidth = 297; // A4 landscape width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`Timetable_${dept}_Sem${sem}_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      toast({ title: "PDF Downloaded!", description: "Timetable has been saved successfully." });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ 
+        title: "Download Failed", 
+        description: "Could not generate PDF. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -32,8 +129,17 @@ export default function TimetableView() {
           <p className="text-muted-foreground text-sm">View and generate class schedules</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast({ title: "Downloading PDF..." })}>
-            <Download className="h-4 w-4 mr-1" /> Export
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleDownloadPDF}
+            disabled={downloading || !timetableQuery.data || Object.keys(timetableQuery.data).length === 0}
+          >
+            {downloading ? (
+              <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Downloading...</>
+            ) : (
+              <><Download className="h-4 w-4 mr-1" /> Export PDF</>
+            )}
           </Button>
           <Button className="gradient-teal text-white shadow-teal" onClick={handleGenerate} disabled={generating}>
             {generating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</> : <><Zap className="h-4 w-4 mr-2" /> Re-Generate</>}
@@ -65,22 +171,28 @@ export default function TimetableView() {
       </div>
 
       {/* Timetable */}
-      {generating ? (
+      {generating || timetableQuery.isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <div className="w-16 h-16 rounded-full gradient-teal flex items-center justify-center mb-4 animate-pulse">
             <Zap className="h-8 w-8 text-white" />
           </div>
-          <p className="text-lg font-semibold text-foreground">AI is generating your timetable...</p>
+          <p className="text-lg font-semibold text-foreground">
+            {generating ? "AI is generating your timetable..." : "Loading timetable..."}
+          </p>
           <p className="text-sm mt-1">Optimizing for conflicts, faculty availability, and room capacity</p>
         </div>
-      ) : showTimetable ? (
-        <div className="animate-fade-in">
+      ) : timetableQuery.isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+          <p className="text-lg font-semibold text-foreground">Failed to load timetable</p>
+          <p className="text-sm mt-1">Please try again after verifying backend is running.</p>
+        </div>
+      ) : timetableQuery.data ? (
+        <div className="animate-fade-in" ref={timetableRef}>
           <div className="flex items-center gap-2 mb-3">
             <Badge className="bg-primary/10 text-primary border-primary/20">{dept}</Badge>
             <Badge variant="outline">Semester {sem}</Badge>
-            <span className="text-xs text-muted-foreground ml-auto">{TIME_SLOTS.length} time slots · 5 days</span>
           </div>
-          <TimetableGridView data={MOCK_TIMETABLE_CS3} />
+          <TimetableGridView data={timetableQuery.data} />
         </div>
       ) : null}
     </AppLayout>

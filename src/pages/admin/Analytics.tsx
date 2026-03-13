@@ -1,10 +1,14 @@
 import AppLayout from "@/components/layout/AppLayout";
-import { WORKLOAD_DATA, ROOM_UTILIZATION_DATA } from "@/lib/mockData";
-import { MOCK_COURSES, MOCK_FACULTY } from "@/lib/mockData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart,
 } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import {
+  fetchFacultyWorkloadAnalytics,
+  fetchRoomUtilizationAnalytics,
+  fetchDepartmentOverviewAnalytics,
+} from "@/lib/api";
 
 const WEEKLY_TREND = [
   { week: "W1", generated: 8, conflicts: 2 },
@@ -15,7 +19,40 @@ const WEEKLY_TREND = [
 ];
 
 export default function Analytics() {
-  const avgWorkload = (WORKLOAD_DATA.reduce((a, b) => a + b.hours, 0) / WORKLOAD_DATA.length).toFixed(1);
+  const workloadQuery = useQuery({
+    queryKey: ["analytics", "faculty-workload"],
+    queryFn: fetchFacultyWorkloadAnalytics,
+  });
+
+  const roomUtilQuery = useQuery({
+    queryKey: ["analytics", "room-utilization"],
+    queryFn: fetchRoomUtilizationAnalytics,
+  });
+
+  const overviewQuery = useQuery({
+    queryKey: ["analytics", "department-overview"],
+    queryFn: fetchDepartmentOverviewAnalytics,
+  });
+
+  const workloadChart =
+    workloadQuery.data?.workload.map((w: any) => ({
+      name: w.faculty_name,
+      hours: w.total_hours,
+    })) ?? [];
+
+  const avgWorkload =
+    workloadChart.length > 0
+      ? (
+          workloadChart.reduce((a, b) => a + b.hours, 0) / workloadChart.length
+        ).toFixed(1)
+      : "0.0";
+
+  const roomUtilChart =
+    roomUtilQuery.data?.utilization.map((u: any) => ({
+      name: u.room_name,
+      value: parseFloat(u.utilization_percentage),
+      fill: "hsl(213, 62%, 30%)",
+    })) ?? [];
 
   return (
     <AppLayout requiredRole="admin" title="Analytics">
@@ -47,7 +84,7 @@ export default function Analytics() {
           <h3 className="font-semibold text-foreground mb-1">Faculty Workload Distribution</h3>
           <p className="text-xs text-muted-foreground mb-4">Weekly teaching hours per faculty member</p>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={WORKLOAD_DATA} layout="vertical" barSize={16}>
+            <BarChart data={workloadChart} layout="vertical" barSize={16}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214,28%,92%)" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 10 }} domain={[0, 12]} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => v.split(" ").slice(-1)[0]} width={60} />
@@ -63,8 +100,8 @@ export default function Analytics() {
           <p className="text-xs text-muted-foreground mb-4">Percentage of time each room is occupied</p>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={ROOM_UTILIZATION_DATA} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}%`} labelLine={false}>
-                {ROOM_UTILIZATION_DATA.map((entry, i) => (
+              <Pie data={roomUtilChart} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}%`} labelLine={false}>
+                {roomUtilChart.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
                 ))}
               </Pie>

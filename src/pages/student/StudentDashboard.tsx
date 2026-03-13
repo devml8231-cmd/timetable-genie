@@ -2,17 +2,43 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import TimetableGridView from "@/components/ui/TimetableGridView";
 import StatCard from "@/components/ui/StatCard";
-import { MOCK_TIMETABLE_CS3, DEPARTMENTS, SEMESTERS } from "@/lib/mockData";
 import { CalendarDays, Download, BookOpen, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { fetchDepartmentTimetable } from "@/lib/api";
+import { TimetableGrid } from "@/types";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const [dept, setDept] = useState(user?.department || "Computer Science");
   const [sem, setSem] = useState(String(user?.semester || 3));
+
+  const timetableQuery = useQuery({
+    queryKey: ["student-timetable", dept, sem],
+    queryFn: async () => {
+      const raw = await fetchDepartmentTimetable(dept, Number(sem));
+      const grid: TimetableGrid = {};
+      raw.forEach((row: any) => {
+        const day = row.time_slot_details?.day || row.day;
+        const start = row.time_slot_details?.start_time;
+        const end = row.time_slot_details?.end_time;
+        if (!day || !start || !end) return;
+        const slotLabel = `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+        if (!grid[day]) grid[day] = {};
+        grid[day][slotLabel] = {
+          courseCode: row.course?.course_name || String(row.course_id),
+          courseName: row.course?.course_name || "",
+          facultyName: row.faculty?.name,
+          room: row.room?.room_name,
+          type: "lecture",
+        };
+      });
+      return grid;
+    },
+  });
 
   const handleDownload = () => {
     toast({ title: "Downloading PDF...", description: "Your timetable is being prepared." });
@@ -48,14 +74,18 @@ export default function StudentDashboard() {
           <label className="text-sm text-muted-foreground">Dept:</label>
           <Select value={dept} onValueChange={setDept}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>{DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {user?.department && <SelectItem value={user.department}>{user.department}</SelectItem>}
+            </SelectContent>
           </Select>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted-foreground">Semester:</label>
           <Select value={sem} onValueChange={setSem}>
             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>{SEMESTERS.map((s) => <SelectItem key={s} value={String(s)}>Sem {s}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {user?.semester && <SelectItem value={String(user.semester)}>Sem {user.semester}</SelectItem>}
+            </SelectContent>
           </Select>
         </div>
         <Button variant="outline" size="sm" className="ml-auto" onClick={handleDownload}>
@@ -71,7 +101,13 @@ export default function StudentDashboard() {
             <p className="text-xs text-muted-foreground">{dept} · Semester {sem}</p>
           </div>
         </div>
-        <TimetableGridView data={MOCK_TIMETABLE_CS3} />
+        {timetableQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading timetable...</p>
+        ) : timetableQuery.isError ? (
+          <p className="text-sm text-destructive">Failed to load timetable.</p>
+        ) : (
+          <TimetableGridView data={timetableQuery.data || {}} />
+        )}
       </div>
     </AppLayout>
   );

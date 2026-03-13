@@ -1,48 +1,112 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { MOCK_CLASSROOMS } from "@/lib/mockData";
 import { Classroom } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Search, Building2, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-const TYPE_BADGE = {
-  lecture: "bg-primary/10 text-primary",
-  lab: "bg-accent/10 text-accent",
-  seminar: "bg-warning/10 text-warning",
-};
+import { Plus, Pencil, Trash2, Search, Building2, Users, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchRooms, createRoom, updateRoom, deleteRoom } from "@/lib/api";
 
 export default function Classrooms() {
-  const [rooms, setRooms] = useState<Classroom[]>(MOCK_CLASSROOMS);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [editItem, setEditItem] = useState<Classroom | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", building: "", capacity: "60", type: "lecture" as Classroom["type"] });
+  const [form, setForm] = useState({ name: "", capacity: "60" });
 
-  const filtered = rooms.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.building.toLowerCase().includes(search.toLowerCase())
+  const { data: rooms = [], isLoading } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: fetchRooms,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createRoom,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      toast({ title: "Room created successfully!" });
+      setDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create room", 
+        description: error.response?.data?.message || "An error occurred",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => updateRoom(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      toast({ title: "Room updated successfully!" });
+      setDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update room", 
+        description: error.response?.data?.message || "An error occurred",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteRoom,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      toast({ title: "Room deleted successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete room", 
+        description: error.response?.data?.message || "Cannot delete room that is in use",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const filtered = (rooms || []).filter((r: any) =>
+    r.room_name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openAdd = () => { setEditItem(null); setForm({ name: "", building: "", capacity: "60", type: "lecture" }); setDialogOpen(true); };
-  const openEdit = (r: Classroom) => { setEditItem(r); setForm({ name: r.name, building: r.building, capacity: String(r.capacity), type: r.type }); setDialogOpen(true); };
+  const openAdd = () => { 
+    setEditItem(null); 
+    setForm({ name: "", capacity: "60" }); 
+    setDialogOpen(true); 
+  };
+
+  const openEdit = (r: any) => { 
+    setEditItem(r); 
+    setForm({ name: r.room_name, capacity: String(r.capacity) }); 
+    setDialogOpen(true); 
+  };
 
   const handleSave = () => {
-    if (!form.name || !form.building) { toast({ title: "Error", description: "Fill required fields.", variant: "destructive" }); return; }
-    if (editItem) {
-      setRooms(rooms.map((r) => r.id === editItem.id ? { ...r, ...form, capacity: +form.capacity } : r));
-      toast({ title: "Classroom updated!" });
-    } else {
-      setRooms([...rooms, { id: `r${Date.now()}`, facilities: [], ...form, capacity: +form.capacity }]);
-      toast({ title: "Classroom added!" });
+    if (!form.name) { 
+      toast({ title: "Error", description: "Room name is required.", variant: "destructive" }); 
+      return; 
     }
-    setDialogOpen(false);
+
+    const payload = {
+      room_name: form.name,
+      capacity: parseInt(form.capacity),
+    };
+
+    if (editItem) {
+      updateMutation.mutate({ id: String(editItem.id), data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this room?")) {
+      deleteMutation.mutate(id);
+    }
   };
 
   return (
@@ -50,7 +114,7 @@ export default function Classrooms() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Classrooms</h1>
-          <p className="text-muted-foreground text-sm">{rooms.length} rooms available</p>
+          <p className="text-muted-foreground text-sm">{(rooms || []).length} rooms available</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -59,26 +123,21 @@ export default function Classrooms() {
           <DialogContent>
             <DialogHeader><DialogTitle>{editItem ? "Edit Classroom" : "Add Classroom"}</DialogTitle></DialogHeader>
             <div className="space-y-3 mt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Room Name *</Label><Input placeholder="CS-101" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Building *</Label><Input placeholder="CS Block" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Capacity</Label><Input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Type</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as Classroom["type"] })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lecture">Lecture Hall</SelectItem>
-                      <SelectItem value="lab">Laboratory</SelectItem>
-                      <SelectItem value="seminar">Seminar Room</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <div className="space-y-1"><Label>Room Name *</Label><Input placeholder="CS-101" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div className="space-y-1"><Label>Capacity *</Label><Input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button className="flex-1 gradient-teal text-white" onClick={handleSave}>Save</Button>
+                <Button 
+                  className="flex-1 gradient-teal text-white" 
+                  onClick={handleSave}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {(createMutation.isPending || updateMutation.isPending) ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -90,30 +149,29 @@ export default function Classrooms() {
         <Input className="pl-9" placeholder="Search rooms..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((room) => (
-          <div key={room.id} className="bg-card rounded-xl border shadow-card p-5 hover:shadow-elevated transition-all">
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2.5 bg-muted rounded-xl"><Building2 className="h-5 w-5 text-muted-foreground" /></div>
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEdit(room)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:text-destructive" onClick={() => { setRooms(rooms.filter((r) => r.id !== room.id)); toast({ title: "Room removed" }); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((room: any) => (
+            <div key={room.id} className="bg-card rounded-xl border shadow-card p-5 hover:shadow-elevated transition-all">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2.5 bg-muted rounded-xl"><Building2 className="h-5 w-5 text-muted-foreground" /></div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEdit(room)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:text-destructive" onClick={() => handleDelete(String(room.id))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
               </div>
-            </div>
-            <h3 className="text-lg font-bold text-foreground">{room.name}</h3>
-            <p className="text-sm text-muted-foreground mb-3">{room.building}</p>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <h3 className="text-lg font-bold text-foreground">{room.room_name}</h3>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-3">
                 <Users className="h-4 w-4" /> {room.capacity} seats
               </div>
-              <span className={cn("text-xs px-2 py-1 rounded-full font-medium capitalize", TYPE_BADGE[room.type])}>{room.type}</span>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {room.facilities.map((f) => <Badge key={f} variant="outline" className="text-xs">{f}</Badge>)}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </AppLayout>
   );
 }
