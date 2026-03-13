@@ -16,7 +16,7 @@ export default function TimeSlots() {
   const queryClient = useQueryClient();
   const [editItem, setEditItem] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ day: "Monday", startTime: "08:00", endTime: "09:00" });
+  const [form, setForm] = useState({ day: "Monday", startTime: "09:00", endTime: "10:00" });
 
   const { data: slots = [], isLoading } = useQuery({
     queryKey: ["time-slots"],
@@ -72,7 +72,7 @@ export default function TimeSlots() {
 
   const openAdd = () => { 
     setEditItem(null); 
-    setForm({ day: "Monday", startTime: "08:00", endTime: "09:00" }); 
+    setForm({ day: "Monday", startTime: "09:00", endTime: "10:00" }); 
     setDialogOpen(true); 
   };
 

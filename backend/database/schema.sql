@@ -126,9 +126,9 @@ CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms
 CREATE TRIGGER update_faculty_availability_updated_at BEFORE UPDATE ON faculty_availability
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Insert sample time slots (8 AM to 5 PM, 1-hour slots)
+-- Insert sample time slots (9 AM to 5 PM, 1-hour slots)
+-- Note: 8-9 AM slot removed as per requirement
 INSERT INTO time_slots (day, start_time, end_time) VALUES
-    ('Monday', '08:00', '09:00'),
     ('Monday', '09:00', '10:00'),
     ('Monday', '10:00', '11:00'),
     ('Monday', '11:00', '12:00'),
@@ -137,7 +137,6 @@ INSERT INTO time_slots (day, start_time, end_time) VALUES
     ('Monday', '14:00', '15:00'),
     ('Monday', '15:00', '16:00'),
     ('Monday', '16:00', '17:00'),
-    ('Tuesday', '08:00', '09:00'),
     ('Tuesday', '09:00', '10:00'),
     ('Tuesday', '10:00', '11:00'),
     ('Tuesday', '11:00', '12:00'),
@@ -146,7 +145,6 @@ INSERT INTO time_slots (day, start_time, end_time) VALUES
     ('Tuesday', '14:00', '15:00'),
     ('Tuesday', '15:00', '16:00'),
     ('Tuesday', '16:00', '17:00'),
-    ('Wednesday', '08:00', '09:00'),
     ('Wednesday', '09:00', '10:00'),
     ('Wednesday', '10:00', '11:00'),
     ('Wednesday', '11:00', '12:00'),
@@ -155,7 +153,6 @@ INSERT INTO time_slots (day, start_time, end_time) VALUES
     ('Wednesday', '14:00', '15:00'),
     ('Wednesday', '15:00', '16:00'),
     ('Wednesday', '16:00', '17:00'),
-    ('Thursday', '08:00', '09:00'),
     ('Thursday', '09:00', '10:00'),
     ('Thursday', '10:00', '11:00'),
     ('Thursday', '11:00', '12:00'),
@@ -164,7 +161,6 @@ INSERT INTO time_slots (day, start_time, end_time) VALUES
     ('Thursday', '14:00', '15:00'),
     ('Thursday', '15:00', '16:00'),
     ('Thursday', '16:00', '17:00'),
-    ('Friday', '08:00', '09:00'),
     ('Friday', '09:00', '10:00'),
     ('Friday', '10:00', '11:00'),
     ('Friday', '11:00', '12:00'),

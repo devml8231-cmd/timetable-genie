@@ -3,7 +3,6 @@ import { Course, Faculty, Classroom, TimeSlot, TimetableGrid, WorkloadData, Room
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export const TIME_SLOTS: TimeSlot[] = [
-  { id: "ts1", label: "8:00 - 9:00", startTime: "08:00", endTime: "09:00" },
   { id: "ts2", label: "9:00 - 10:00", startTime: "09:00", endTime: "10:00" },
   { id: "ts3", label: "10:00 - 11:00", startTime: "10:00", endTime: "11:00" },
   { id: "ts4", label: "11:00 - 12:00", startTime: "11:00", endTime: "12:00" },
@@ -23,11 +22,11 @@ export const MOCK_COURSES: Course[] = [
 ];
 
 export const MOCK_FACULTY: Faculty[] = [
-  { id: "f1", name: "Dr. Priya Sharma", email: "priya.sharma@edu.ac.in", department: "Computer Science", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts1","ts2","ts3","ts6","ts7"], assignedCourses: ["c1","c4"] },
+  { id: "f1", name: "Dr. Priya Sharma", email: "priya.sharma@edu.ac.in", department: "Computer Science", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts2","ts3","ts6","ts7"], assignedCourses: ["c1","c4"] },
   { id: "f2", name: "Prof. Rajesh Kumar", email: "rajesh.kumar@edu.ac.in", department: "Computer Science", designation: "Associate Professor", maxHoursPerDay: 4, availableSlots: ["ts2","ts3","ts4","ts6","ts7","ts8"], assignedCourses: ["c2"] },
-  { id: "f3", name: "Dr. Anita Verma", email: "anita.verma@edu.ac.in", department: "Computer Science", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts1","ts2","ts3","ts4"], assignedCourses: ["c3"] },
+  { id: "f3", name: "Dr. Anita Verma", email: "anita.verma@edu.ac.in", department: "Computer Science", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts2","ts3","ts4"], assignedCourses: ["c3"] },
   { id: "f4", name: "Prof. Suresh Mehta", email: "suresh.mehta@edu.ac.in", department: "Computer Science", designation: "Assistant Professor", maxHoursPerDay: 4, availableSlots: ["ts3","ts4","ts5","ts6","ts7"], assignedCourses: ["c5"] },
-  { id: "f5", name: "Dr. Kavita Nair", email: "kavita.nair@edu.ac.in", department: "Electronics", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts1","ts2","ts6","ts7","ts8"], assignedCourses: ["c6"] },
+  { id: "f5", name: "Dr. Kavita Nair", email: "kavita.nair@edu.ac.in", department: "Electronics", designation: "Professor", maxHoursPerDay: 3, availableSlots: ["ts2","ts6","ts7","ts8"], assignedCourses: ["c6"] },
 ];
 
 export const MOCK_CLASSROOMS: Classroom[] = [
@@ -40,7 +39,6 @@ export const MOCK_CLASSROOMS: Classroom[] = [
 
 export const MOCK_TIMETABLE_CS3: TimetableGrid = {
   "Monday": {
-    "8:00 - 9:00": { courseCode: "CS301", courseName: "Data Structures", facultyName: "Dr. Priya Sharma", room: "CS-101", type: "lecture" },
     "9:00 - 10:00": { courseCode: "CS302", courseName: "DBMS", facultyName: "Prof. Rajesh Kumar", room: "LH-201", type: "lecture" },
     "10:00 - 11:00": null,
     "11:00 - 12:00": { courseCode: "CS303", courseName: "Operating Systems", facultyName: "Dr. Anita Verma", room: "CS-101", type: "lecture" },
@@ -50,7 +48,6 @@ export const MOCK_TIMETABLE_CS3: TimetableGrid = {
     "16:00 - 17:00": null,
   },
   "Tuesday": {
-    "8:00 - 9:00": null,
     "9:00 - 10:00": { courseCode: "CS302", courseName: "DBMS", facultyName: "Prof. Rajesh Kumar", room: "LH-201", type: "lecture" },
     "10:00 - 11:00": { courseCode: "CS301", courseName: "Data Structures", facultyName: "Dr. Priya Sharma", room: "CS-101", type: "lecture" },
     "11:00 - 12:00": null,
@@ -60,7 +57,6 @@ export const MOCK_TIMETABLE_CS3: TimetableGrid = {
     "16:00 - 17:00": null,
   },
   "Wednesday": {
-    "8:00 - 9:00": { courseCode: "CS303", courseName: "Operating Systems", facultyName: "Dr. Anita Verma", room: "CS-101", type: "lecture" },
     "9:00 - 10:00": null,
     "10:00 - 11:00": { courseCode: "CS302", courseName: "DBMS", facultyName: "Prof. Rajesh Kumar", room: "LH-201", type: "lecture" },
     "11:00 - 12:00": { courseCode: "CS301", courseName: "Data Structures", facultyName: "Dr. Priya Sharma", room: "CS-101", type: "lecture" },
@@ -70,7 +66,6 @@ export const MOCK_TIMETABLE_CS3: TimetableGrid = {
     "16:00 - 17:00": null,
   },
   "Thursday": {
-    "8:00 - 9:00": null,
     "9:00 - 10:00": { courseCode: "CS301", courseName: "Data Structures", facultyName: "Dr. Priya Sharma", room: "CS-101", type: "lecture" },
     "10:00 - 11:00": null,
     "11:00 - 12:00": { courseCode: "CS302", courseName: "DBMS", facultyName: "Prof. Rajesh Kumar", room: "LH-201", type: "lecture" },
@@ -80,7 +75,6 @@ export const MOCK_TIMETABLE_CS3: TimetableGrid = {
     "16:00 - 17:00": null,
   },
   "Friday": {
-    "8:00 - 9:00": { courseCode: "CS302", courseName: "DBMS Lab", facultyName: "Prof. Rajesh Kumar", room: "CS-Lab1", type: "lab" },
     "9:00 - 10:00": { courseCode: "CS302", courseName: "DBMS Lab", facultyName: "Prof. Rajesh Kumar", room: "CS-Lab1", type: "lab" },
     "10:00 - 11:00": null,
     "11:00 - 12:00": { courseCode: "CS301", courseName: "Data Structures", facultyName: "Dr. Priya Sharma", room: "CS-101", type: "lecture" },
